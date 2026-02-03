@@ -1,0 +1,30 @@
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+npm-debug.log*
+
+# Temporary files
+*.tmp
+*.temp
+
+# Environment files (if you add any)
+.env
+.env.local
+
+# Don't ignore the downloaded library
+!lib/html5-qrcode.min.js
+
+# Personal notes
+notes.txt
+TODO.txt

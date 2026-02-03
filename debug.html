@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug - Inventory Manager</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+        .test-section {
+            background: #f5f5f5;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+        }
+        input, button {
+            padding: 10px;
+            font-size: 16px;
+            margin: 5px;
+        }
+        button {
+            background: #2196F3;
+            color: white;
+            border: none;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        button:hover {
+            background: #1976D2;
+        }
+        #result {
+            background: white;
+            border: 1px solid #ddd;
+            padding: 15px;
+            margin-top: 20px;
+            border-radius: 4px;
+            white-space: pre-wrap;
+            font-family: monospace;
+        }
+        .error { color: red; }
+        .success { color: green; }
+        .info { color: blue; }
+    </style>
+</head>
+<body>
+    <h1>📋 Inventory Manager - Debug Tool</h1>
+
+    <div class="test-section">
+        <h2>Configuration Check</h2>
+        <p><strong>Apps Script URL:</strong></p>
+        <p id="scriptUrl" style="word-break: break-all; background: white; padding: 10px; border-radius: 4px;"></p>
+        <p id="configStatus"></p>
+    </div>
+
+    <div class="test-section">
+        <h2>Test Book Lookup</h2>
+        <p>Enter a book code from your Google Sheet:</p>
+        <input type="text" id="bookCodeInput" placeholder="Enter book code" style="width: 300px;">
+        <button onclick="testLookup()">Test Lookup</button>
+
+        <div id="result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Instructions</h2>
+        <ol>
+            <li>Enter a book code that you KNOW exists in your Google Sheet</li>
+            <li>Click "Test Lookup"</li>
+            <li>The result will show you exactly what the Apps Script returns</li>
+            <li>If there's an error, you'll see the exact error message</li>
+        </ol>
+    </div>
+
+    <script src="js/sheets-api.js"></script>
+    <script>
+        // Display configuration
+        document.getElementById('scriptUrl').textContent = window.sheetsAPI.SCRIPT_URL;
+
+        if (window.sheetsAPI.isConfigured()) {
+            document.getElementById('configStatus').innerHTML = '<span class="success">✅ Apps Script URL is configured</span>';
+        } else {
+            document.getElementById('configStatus').innerHTML = '<span class="error">❌ Apps Script URL is NOT configured</span>';
+        }
+
+        async function testLookup() {
+            const bookCode = document.getElementById('bookCodeInput').value.trim();
+            const resultDiv = document.getElementById('result');
+
+            if (!bookCode) {
+                resultDiv.innerHTML = '<span class="error">Please enter a book code</span>';
+                return;
+            }
+
+            resultDiv.innerHTML = '<span class="info">🔄 Looking up book code: ' + bookCode + '...</span>';
+
+            try {
+                // Show the exact URL being called
+                const url = window.sheetsAPI.SCRIPT_URL + '?code=' + encodeURIComponent(bookCode);
+                console.log('Calling:', url);
+
+                const book = await window.sheetsAPI.lookupBook(bookCode);
+
+                // Success!
+                resultDiv.innerHTML = `<span class="success">✅ SUCCESS!</span>
+
+Book Found:
+${JSON.stringify(book, null, 2)}
+
+This means your setup is working correctly!`;
+
+            } catch (error) {
+                // Show the error
+                resultDiv.innerHTML = `<span class="error">❌ ERROR</span>
+
+Error Message: ${error.message}
+
+Full Error:
+${JSON.stringify(error, null, 2)}
+
+<strong>Common Solutions:</strong>
+
+1. If error says "Book not found":
+   - Verify the book code exists in your Books sheet
+   - Check for extra spaces or different capitalization
+   - Make sure book_code column has the exact value
+
+2. If error mentions "column not found":
+   - Check that row 1 has: book_code | book_series | book_name | total | last_update
+   - Headers must be lowercase with underscore
+   - No extra spaces in headers
+
+3. If error is about network/CORS:
+   - Make sure Apps Script is deployed with "Anyone" access
+   - Try redeploying the Apps Script
+
+4. If error mentions "script":
+   - Check that Code.gs is deployed correctly
+   - Verify the Apps Script URL is correct`;
+
+                console.error('Lookup error:', error);
+            }
+        }
+
+        // Allow Enter key to submit
+        document.getElementById('bookCodeInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                testLookup();
+            }
+        });
+    </script>
+</body>
+</html>

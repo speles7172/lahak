@@ -1,0 +1,32 @@
+HTML5-QRCode Library Download Instructions
+============================================
+
+To complete the setup, you need to download the html5-qrcode library.
+
+OPTION 1: Download Manually (Recommended)
+------------------------------------------
+1. Visit: https://github.com/mebjas/html5-qrcode/releases
+2. Download the latest release (v2.3.8 or newer)
+3. Extract the minified file: html5-qrcode.min.js
+4. Place it in this directory: c:\Users\shmue\claude\lib\html5-qrcode.min.js
+
+OPTION 2: Use CDN (Temporary/Testing)
+--------------------------------------
+If you want to test quickly without downloading, you can modify index.html
+to use the CDN version instead:
+
+Replace:
+    <script src="lib/html5-qrcode.min.js"></script>
+
+With:
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+
+Note: CDN version requires internet connection to work.
+
+OPTION 3: Download via Command Line
+------------------------------------
+Run this command in the lib directory:
+
+curl -L -o html5-qrcode.min.js https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js
+
+After downloading, the app will be ready to use!

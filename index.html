@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#2196F3">
+    <title>Inventory Manager</title>
+
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="manifest.json">
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="icons/icon-192.png">
+    <link rel="apple-touch-icon" href="icons/icon-192.png">
+
+    <!-- Styles -->
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <!-- Header -->
+    <header class="app-header">
+        <h1>📦 Inventory Manager</h1>
+    </header>
+
+    <!-- Main Content -->
+    <main class="app-main">
+        <!-- Scanner Section -->
+        <section class="scanner-section">
+            <h2>Scan or Enter Book Code</h2>
+
+            <!-- Scanner Container (hidden by default) -->
+            <div id="scanner-container" class="scanner-container" style="display: none;">
+                <div id="qr-reader"></div>
+                <button id="stop-scan-btn" class="btn btn-secondary">Stop Scanner</button>
+            </div>
+
+            <!-- Input Controls -->
+            <div class="input-controls">
+                <button id="start-scan-btn" class="btn btn-primary btn-large">
+                    📷 Scan Barcode
+                </button>
+                <div class="divider">OR</div>
+                <div class="manual-input">
+                    <input
+                        type="text"
+                        id="manual-code-input"
+                        placeholder="Enter book code manually"
+                        inputmode="numeric"
+                        autocomplete="off"
+                    >
+                    <button id="lookup-btn" class="btn btn-primary">Lookup</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Book Display Section -->
+        <section id="book-section" class="book-section" style="display: none;">
+            <h2>Book Details</h2>
+            <div class="book-card">
+                <div class="book-info">
+                    <div class="info-row">
+                        <span class="label">Code:</span>
+                        <span id="book-code" class="value"></span>
+                    </div>
+                    <div class="info-row">
+                        <span class="label">Name:</span>
+                        <span id="book-name" class="value"></span>
+                    </div>
+                    <div class="info-row">
+                        <span class="label">Series:</span>
+                        <span id="book-series" class="value"></span>
+                    </div>
+                    <div class="info-row">
+                        <span class="label">Current Total:</span>
+                        <span id="book-total" class="value highlight"></span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Transaction Form Section -->
+        <section id="transaction-section" class="transaction-section" style="display: none;">
+            <h2>Record Transaction</h2>
+            <form id="transaction-form" class="transaction-form">
+                <div class="form-group">
+                    <label for="qty-input">Quantity *</label>
+                    <input
+                        type="number"
+                        id="qty-input"
+                        placeholder="Enter quantity (negative for out)"
+                        required
+                        step="1"
+                    >
+                    <small class="help-text">Positive for IN, negative for OUT</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="location-input">Location *</label>
+                    <input
+                        type="text"
+                        id="location-input"
+                        placeholder="e.g., Warehouse A, Shelf B2"
+                        required
+                        autocomplete="off"
+                    >
+                </div>
+
+                <div class="form-group">
+                    <label for="user-input">Your Name *</label>
+                    <input
+                        type="text"
+                        id="user-input"
+                        placeholder="Enter your name"
+                        required
+                        autocomplete="name"
+                    >
+                </div>
+
+                <div class="form-group">
+                    <label for="comments-input">Comments</label>
+                    <textarea
+                        id="comments-input"
+                        placeholder="Optional notes or comments"
+                        rows="3"
+                    ></textarea>
+                </div>
+
+                <button type="submit" class="btn btn-success btn-large">
+                    ✓ Submit Transaction
+                </button>
+            </form>
+        </section>
+
+        <!-- Status Messages -->
+        <div id="status-message" class="status-message" style="display: none;"></div>
+
+        <!-- Loading Spinner -->
+        <div id="loading-spinner" class="loading-spinner" style="display: none;">
+            <div class="spinner"></div>
+            <p>Processing...</p>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="app-footer">
+        <p>Mobile Inventory Management v1.0</p>
+    </footer>
+
+    <!-- Scripts -->
+    <script src="lib/html5-qrcode.min.js"></script>
+    <script src="js/sheets-api.js"></script>
+    <script src="js/scanner.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>

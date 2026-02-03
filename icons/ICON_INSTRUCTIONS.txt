@@ -1,0 +1,44 @@
+App Icons for PWA
+==================
+
+To complete the PWA setup, you need two icon files:
+
+Required Icons:
+- icon-192.png (192x192 pixels)
+- icon-512.png (512x512 pixels)
+
+OPTION 1: Create Custom Icons
+-------------------------------
+Use any image editor (Photoshop, GIMP, Canva, Figma) to create:
+1. A 512x512 PNG image with your app logo/design
+2. A 192x192 PNG version of the same design
+3. Save them in this directory
+
+Design Tips:
+- Use simple, recognizable imagery
+- High contrast works best
+- Consider a package/box icon for inventory theme
+- Ensure the icon looks good at small sizes
+
+OPTION 2: Use Placeholder Icons
+--------------------------------
+For quick testing, you can use simple placeholder icons.
+Download free icons from:
+- https://iconscout.com/
+- https://www.flaticon.com/
+- https://icons8.com/
+
+Search for: "box", "package", "inventory", "warehouse"
+
+OPTION 3: Generate Online
+--------------------------
+Use an online PWA icon generator:
+- https://www.pwabuilder.com/imageGenerator
+- Upload a base image and it will generate all sizes
+
+Icon Requirements:
+- Format: PNG
+- Background: Solid color or transparent
+- Safe area: Keep important content in center 80%
+
+After adding icons, the app can be installed to mobile home screen!
