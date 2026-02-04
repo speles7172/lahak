@@ -11,7 +11,7 @@ class SheetsAPI {
 
     // Check if URL is configured
     if (this.SCRIPT_URL === 'YOUR_GOOGLE_APPS_SCRIPT_URL_HERE') {
-      console.warn('⚠️ Google Apps Script URL not configured! Please update SCRIPT_URL in sheets-api.js');
+      console.warn('Google Apps Script URL not configured! Please update SCRIPT_URL in sheets-api.js');
     }
   }
 
@@ -21,41 +21,37 @@ class SheetsAPI {
    */
   setScriptURL(url) {
     this.SCRIPT_URL = url;
-    console.log('✓ Google Apps Script URL configured');
+    console.log('Google Apps Script URL configured');
   }
 
   /**
-   * Look up a book by book code
-   * @param {string} bookCode - The book code to look up
-   * @returns {Promise<object>} Book details
+   * Load initial data (user validation, locations, books)
+   * This is called once after Google Sign-In to load all data into memory
+   * @param {string} email - User's email from Google Sign-In
+   * @returns {Promise<object>} Object with user, locations, and books
    */
-  async lookupBook(bookCode) {
+  async loadInitData(email) {
     if (!this.isConfigured()) {
       throw new Error('Google Apps Script URL not configured');
     }
 
     try {
-      const url = `${this.SCRIPT_URL}?code=${encodeURIComponent(bookCode)}`;
+      const url = `${this.SCRIPT_URL}?action=init&email=${encodeURIComponent(email)}`;
 
-      // Simple GET request - no preflight needed
       const response = await fetch(url, {
         redirect: 'follow'
       });
 
       const data = await response.json();
 
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to lookup book');
-      }
-
       if (data.error) {
-        throw new Error(data.error);
+        throw new Error(data.message || data.error);
       }
 
       return data;
 
     } catch (error) {
-      console.error('Error looking up book:', error);
+      console.error('Error loading init data:', error);
       throw error;
     }
   }
@@ -65,10 +61,10 @@ class SheetsAPI {
    * @param {object} transaction - Transaction data
    * @param {string} transaction.book_code - Book code
    * @param {number} transaction.qty - Quantity (positive for in, negative for out)
-   * @param {string} transaction.location - Location
+   * @param {string} transaction.location - Location name
    * @param {string} transaction.user - User name
    * @param {string} transaction.comments - Optional comments
-   * @returns {Promise<object>} Result with updated total
+   * @returns {Promise<object>} Result with updated quantities
    */
   async submitTransaction(transaction) {
     if (!this.isConfigured()) {
@@ -104,10 +100,6 @@ class SheetsAPI {
 
       const data = await response.json();
 
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to submit transaction');
-      }
-
       if (data.error) {
         throw new Error(data.error);
       }
@@ -127,29 +119,6 @@ class SheetsAPI {
   isConfigured() {
     return this.SCRIPT_URL !== 'YOUR_GOOGLE_APPS_SCRIPT_URL_HERE' &&
            this.SCRIPT_URL.trim() !== '';
-  }
-
-  /**
-   * Test the connection to Google Apps Script
-   * @returns {Promise<boolean>}
-   */
-  async testConnection() {
-    if (!this.isConfigured()) {
-      return false;
-    }
-
-    try {
-      // Try to lookup a dummy book code to test connection
-      await fetch(this.SCRIPT_URL + '?code=TEST', {
-        method: 'GET',
-        mode: 'cors',
-        cache: 'no-cache',
-      });
-      return true;
-    } catch (error) {
-      console.error('Connection test failed:', error);
-      return false;
-    }
   }
 }
 

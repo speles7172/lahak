@@ -1,18 +1,39 @@
 /**
  * Main Application Logic
- * Orchestrates scanner, API calls, and UI updates
+ * Orchestrates authentication, scanner, API calls, and UI updates
  */
 
 // Application state
 const appState = {
+  // Authentication
+  isAuthenticated: false,
+  userEmail: null,
+
+  // Cached data (loaded once on login)
+  user: null,         // { email, name, default_location }
+  locations: [],      // [{ code, name }, ...]
+  books: new Map(),   // Map<normalized_code, book_object> for O(1) lookup
+
+  // Current transaction
   currentBook: null,
   scanner: null,
-  isLoading: false,
-  userName: localStorage.getItem('inventory_user_name') || ''
+  isLoading: false
 };
 
 // DOM elements
 const elements = {
+  // Login section
+  loginSection: document.getElementById('login-section'),
+  authError: document.getElementById('auth-error'),
+
+  // User info
+  userInfo: document.getElementById('user-info'),
+  userDisplayName: document.getElementById('user-display-name'),
+  signOutBtn: document.getElementById('sign-out-btn'),
+
+  // Main app
+  appMain: document.getElementById('app-main'),
+
   // Scanner controls
   startScanBtn: document.getElementById('start-scan-btn'),
   stopScanBtn: document.getElementById('stop-scan-btn'),
@@ -25,14 +46,14 @@ const elements = {
   bookCode: document.getElementById('book-code'),
   bookName: document.getElementById('book-name'),
   bookSeries: document.getElementById('book-series'),
-  bookTotal: document.getElementById('book-total'),
+  bookVolume: document.getElementById('book-volume'),
+  bookLocations: document.getElementById('book-locations'),
 
   // Transaction form
   transactionSection: document.getElementById('transaction-section'),
   transactionForm: document.getElementById('transaction-form'),
   qtyInput: document.getElementById('qty-input'),
-  locationInput: document.getElementById('location-input'),
-  userInput: document.getElementById('user-input'),
+  locationSelect: document.getElementById('location-select'),
   commentsInput: document.getElementById('comments-input'),
 
   // Status and loading
@@ -41,35 +62,207 @@ const elements = {
 };
 
 /**
- * Initialize the application
+ * Handle Google Sign-In callback
+ * Called by Google Identity Services when user signs in
  */
-function initApp() {
-  console.log('Initializing Inventory Manager...');
+function handleGoogleSignIn(response) {
+  // Decode the JWT token to get user info
+  const payload = parseJwt(response.credential);
+
+  if (!payload || !payload.email) {
+    showAuthError('Failed to get user information from Google.');
+    return;
+  }
+
+  appState.userEmail = payload.email;
+
+  // Show loading
+  setLoading(true);
+  hideAuthError();
+
+  // Load initial data from backend
+  loadInitialData(payload.email);
+}
+
+/**
+ * Parse JWT token
+ */
+function parseJwt(token) {
+  try {
+    const base64Url = token.split('.')[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+      return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+    }).join(''));
+    return JSON.parse(jsonPayload);
+  } catch (e) {
+    console.error('Failed to parse JWT:', e);
+    return null;
+  }
+}
+
+/**
+ * Load initial data from backend
+ * This is called once after Google Sign-In
+ */
+async function loadInitialData(email) {
+  try {
+    const data = await window.sheetsAPI.loadInitData(email);
+
+    // Store user info
+    appState.user = data.user;
+    appState.locations = data.locations;
+
+    // Build books map for O(1) lookup
+    appState.books.clear();
+    for (const book of data.books) {
+      const normalizedCode = normalizeBookCode(book.Book_code);
+      appState.books.set(normalizedCode, book);
+    }
+
+    // Mark as authenticated
+    appState.isAuthenticated = true;
+
+    // Update UI
+    showMainApp();
+    populateLocationsDropdown();
+
+    console.log('Initial data loaded:', {
+      user: appState.user,
+      locationsCount: appState.locations.length,
+      booksCount: appState.books.size
+    });
+
+  } catch (error) {
+    console.error('Failed to load initial data:', error);
+
+    if (error.message.includes('not authorized') || error.message.includes('not registered')) {
+      showAuthError(error.message);
+    } else {
+      showAuthError('Failed to connect to the server. Please try again.');
+    }
+  } finally {
+    setLoading(false);
+  }
+}
+
+/**
+ * Normalize book code for comparison
+ */
+function normalizeBookCode(code) {
+  return code.toString().replace(/[-\s]/g, '').toUpperCase();
+}
+
+/**
+ * Show authentication error
+ */
+function showAuthError(message) {
+  elements.authError.innerHTML = `<p>${message}</p><p>Please contact the administrator to request access.</p>`;
+  elements.authError.style.display = 'block';
+}
+
+/**
+ * Hide authentication error
+ */
+function hideAuthError() {
+  elements.authError.style.display = 'none';
+}
+
+/**
+ * Show main app after successful authentication
+ */
+function showMainApp() {
+  // Hide login section
+  elements.loginSection.style.display = 'none';
+
+  // Show user info in header
+  elements.userDisplayName.textContent = appState.user.name || appState.user.email;
+  elements.userInfo.style.display = 'flex';
+
+  // Show main app
+  elements.appMain.style.display = 'block';
 
   // Initialize scanner
+  initScanner();
+}
+
+/**
+ * Populate locations dropdown from cached data
+ */
+function populateLocationsDropdown() {
+  const select = elements.locationSelect;
+
+  // Clear existing options (except the placeholder)
+  select.innerHTML = '<option value="">Select a location...</option>';
+
+  // Add locations
+  for (const location of appState.locations) {
+    const option = document.createElement('option');
+    option.value = location.name;
+    option.textContent = location.name;
+    select.appendChild(option);
+  }
+
+  // Set default location if user has one
+  if (appState.user.default_location) {
+    select.value = appState.user.default_location;
+  }
+}
+
+/**
+ * Handle sign out
+ */
+function handleSignOut() {
+  // Clear state
+  appState.isAuthenticated = false;
+  appState.userEmail = null;
+  appState.user = null;
+  appState.locations = [];
+  appState.books.clear();
+  appState.currentBook = null;
+
+  // Reset UI
+  elements.appMain.style.display = 'none';
+  elements.userInfo.style.display = 'none';
+  elements.loginSection.style.display = 'block';
+  hideAuthError();
+  hideBookDisplay();
+  hideTransactionForm();
+
+  // Revoke Google session
+  if (typeof google !== 'undefined' && google.accounts) {
+    google.accounts.id.disableAutoSelect();
+  }
+
+  // Reload page to reset Google Sign-In
+  window.location.reload();
+}
+
+/**
+ * Initialize scanner
+ */
+function initScanner() {
   appState.scanner = new BarcodeScanner();
   appState.scanner.init(onScanSuccess, onScanError);
 
   // Set up event listeners
   setupEventListeners();
 
-  // Restore user name from localStorage
-  if (appState.userName) {
-    elements.userInput.value = appState.userName;
-  }
-
   // Check if API is configured
   if (!window.sheetsAPI.isConfigured()) {
-    showStatus('⚠️ Please configure Google Apps Script URL in sheets-api.js', 'warning', 0);
+    showStatus('Please configure Google Apps Script URL in sheets-api.js', 'warning', 0);
   }
 
-  console.log('✓ App initialized');
+  console.log('App initialized');
 }
 
 /**
  * Set up event listeners
  */
 function setupEventListeners() {
+  // Sign out button
+  elements.signOutBtn.addEventListener('click', handleSignOut);
+
   // Start scan button
   elements.startScanBtn.addEventListener('click', startScanning);
 
@@ -95,15 +288,6 @@ function setupEventListeners() {
 
   // Transaction form submit
   elements.transactionForm.addEventListener('submit', handleTransactionSubmit);
-
-  // Save user name to localStorage when changed
-  elements.userInput.addEventListener('change', () => {
-    const userName = elements.userInput.value.trim();
-    if (userName) {
-      localStorage.setItem('inventory_user_name', userName);
-      appState.userName = userName;
-    }
-  });
 }
 
 /**
@@ -124,7 +308,7 @@ async function startScanning() {
 
     // Start scanner
     await appState.scanner.start();
-    showStatus('📷 Scanner active - point camera at barcode', 'info', 3000);
+    showStatus('Scanner active - point camera at barcode', 'info', 3000);
 
   } catch (error) {
     console.error('Failed to start scanner:', error);
@@ -172,53 +356,50 @@ function onScanError(errorMessage) {
 }
 
 /**
- * Look up a book by code
+ * Look up a book by code (from cached data - NO API call)
  */
-async function lookupBook(bookCode) {
-  if (appState.isLoading) {
-    return;
-  }
-
-  setLoading(true);
+function lookupBook(bookCode) {
   hideStatus();
 
-  try {
-    showStatus('Looking up book...', 'info', 0);
+  const normalizedCode = normalizeBookCode(bookCode);
+  const book = appState.books.get(normalizedCode);
 
-    const book = await window.sheetsAPI.lookupBook(bookCode);
-
-    appState.currentBook = book;
-    displayBook(book);
-    showTransactionForm();
-
-    showStatus('✓ Book found!', 'success', 3000);
-
-  } catch (error) {
-    console.error('Lookup error:', error);
+  if (!book) {
     appState.currentBook = null;
     hideBookDisplay();
     hideTransactionForm();
-
-    if (error.message.includes('Book not found')) {
-      showStatus(`❌ Book code "${bookCode}" not found in inventory`, 'error');
-    } else if (error.message.includes('not configured')) {
-      showStatus('⚠️ Google Apps Script URL not configured', 'warning');
-    } else {
-      showStatus(`Error: ${error.message}`, 'error');
-    }
-  } finally {
-    setLoading(false);
+    showStatus(`Book code "${bookCode}" not found in inventory`, 'error');
+    return;
   }
+
+  appState.currentBook = book;
+  displayBook(book);
+  showTransactionForm();
+  showStatus('Book found!', 'success', 2000);
 }
 
 /**
  * Display book information
  */
 function displayBook(book) {
-  elements.bookCode.textContent = book.book_code || '';
-  elements.bookName.textContent = book.book_name || 'N/A';
-  elements.bookSeries.textContent = book.book_series || 'N/A';
-  elements.bookTotal.textContent = book.total !== undefined ? book.total : '0';
+  elements.bookCode.textContent = book.Book_code || '';
+  elements.bookName.textContent = book.Book_name || 'N/A';
+  elements.bookSeries.textContent = book.Book_series || 'N/A';
+  elements.bookVolume.textContent = book.Volume || 'N/A';
+
+  // Display location-specific quantities
+  const locationsHtml = [];
+  if (book.locations) {
+    for (const [locName, qty] of Object.entries(book.locations)) {
+      locationsHtml.push(`
+        <div class="info-row location-qty">
+          <span class="label">${locName}:</span>
+          <span class="value highlight">${qty || 0}</span>
+        </div>
+      `);
+    }
+  }
+  elements.bookLocations.innerHTML = locationsHtml.join('');
 
   elements.bookSection.style.display = 'block';
 }
@@ -235,6 +416,11 @@ function hideBookDisplay() {
  */
 function showTransactionForm() {
   elements.transactionSection.style.display = 'block';
+
+  // Reset form but keep location
+  elements.qtyInput.value = '';
+  elements.commentsInput.value = '';
+
   // Focus on quantity input for quick entry
   elements.qtyInput.focus();
 }
@@ -263,8 +449,7 @@ async function handleTransactionSubmit(e) {
 
   // Get form data
   const qty = parseFloat(elements.qtyInput.value);
-  const location = elements.locationInput.value.trim();
-  const user = elements.userInput.value.trim();
+  const location = elements.locationSelect.value;
   const comments = elements.commentsInput.value.trim();
 
   // Validate
@@ -275,27 +460,21 @@ async function handleTransactionSubmit(e) {
   }
 
   if (!location) {
-    showStatus('Please enter a location', 'error');
-    elements.locationInput.focus();
-    return;
-  }
-
-  if (!user) {
-    showStatus('Please enter your name', 'error');
-    elements.userInput.focus();
+    showStatus('Please select a location', 'error');
+    elements.locationSelect.focus();
     return;
   }
 
   // Prepare transaction
   const transaction = {
-    book_code: appState.currentBook.book_code,
+    book_code: appState.currentBook.Book_code,
     qty: qty,
     location: location,
-    user: user,
+    user: appState.user.name || appState.user.email,
     comments: comments
   };
 
-  // Submit transaction
+  // Submit transaction (THIS IS THE ONLY API CALL DURING NORMAL USE)
   setLoading(true);
   hideStatus();
 
@@ -306,28 +485,28 @@ async function handleTransactionSubmit(e) {
 
     console.log('Transaction result:', result);
 
-    // Update displayed total
-    elements.bookTotal.textContent = result.new_total;
+    // Update cached book data
+    if (appState.currentBook.locations) {
+      appState.currentBook.locations[location] = result.new_qty;
+    }
+
+    // Re-display book with updated quantities
+    displayBook(appState.currentBook);
 
     // Show success message
     const qtyText = qty > 0 ? `+${qty}` : qty;
     showStatus(
-      `✓ Transaction recorded: ${qtyText} ${result.book_name} (New total: ${result.new_total})`,
+      `Transaction recorded: ${qtyText} ${result.book_name} at ${location} (New qty: ${result.new_qty})`,
       'success',
       5000
     );
 
-    // Reset form
+    // Reset form for next transaction
     resetTransactionForm();
-
-    // Update current book total
-    if (appState.currentBook) {
-      appState.currentBook.total = result.new_total;
-    }
 
   } catch (error) {
     console.error('Transaction error:', error);
-    showStatus(`❌ Failed to submit transaction: ${error.message}`, 'error');
+    showStatus(`Failed to submit transaction: ${error.message}`, 'error');
   } finally {
     setLoading(false);
   }
@@ -338,9 +517,8 @@ async function handleTransactionSubmit(e) {
  */
 function resetTransactionForm() {
   elements.qtyInput.value = '';
-  elements.locationInput.value = '';
   elements.commentsInput.value = '';
-  // Don't reset user name - keep it for next transaction
+  // Keep location selected for convenience
 
   // Hide book and form, ready for next scan
   hideBookDisplay();
@@ -362,14 +540,16 @@ function setLoading(isLoading) {
   elements.loadingSpinner.style.display = isLoading ? 'flex' : 'none';
 
   // Disable form inputs while loading
-  const formElements = elements.transactionForm.querySelectorAll('input, textarea, button');
-  formElements.forEach(el => {
-    el.disabled = isLoading;
-  });
+  if (elements.transactionForm) {
+    const formElements = elements.transactionForm.querySelectorAll('input, textarea, select, button');
+    formElements.forEach(el => {
+      el.disabled = isLoading;
+    });
+  }
 
-  elements.startScanBtn.disabled = isLoading;
-  elements.lookupBtn.disabled = isLoading;
-  elements.manualCodeInput.disabled = isLoading;
+  if (elements.startScanBtn) elements.startScanBtn.disabled = isLoading;
+  if (elements.lookupBtn) elements.lookupBtn.disabled = isLoading;
+  if (elements.manualCodeInput) elements.manualCodeInput.disabled = isLoading;
 }
 
 /**
@@ -396,13 +576,7 @@ function hideStatus() {
   elements.statusMessage.style.display = 'none';
 }
 
-// Initialize app when DOM is ready
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', initApp);
-} else {
-  initApp();
-}
-
-// Expose for debugging
+// Expose for debugging and Google Sign-In callback
 window.appState = appState;
 window.lookupBook = lookupBook;
+window.handleGoogleSignIn = handleGoogleSignIn;
