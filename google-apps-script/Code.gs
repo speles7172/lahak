@@ -154,8 +154,8 @@ function getLocations() {
   for (let i = 1; i < data.length; i++) {
     if (data[i][codeCol] || data[i][nameCol]) {
       locations.push({
-        code: data[i][codeCol],
-        name: data[i][nameCol]
+        code: data[i][codeCol].toString().trim(),
+        name: data[i][nameCol].toString().trim()
       });
     }
   }
@@ -194,8 +194,9 @@ function getAllBooks() {
   const standardCols = ['Book_code', 'Book_series', 'Book_name', 'Volume', 'Total', 'Last_update'];
   const locationCols = [];
   for (let i = 0; i < headers.length; i++) {
-    if (!standardCols.includes(headers[i]) && headers[i]) {
-      locationCols.push({ index: i, name: headers[i] });
+    const headerName = headers[i].toString().trim();
+    if (!standardCols.includes(headerName) && headerName) {
+      locationCols.push({ index: i, name: headerName });
     }
   }
 
@@ -256,7 +257,7 @@ function doPost(e) {
     const result = addTransaction({
       book_code: data.book_code,
       qty: qty,
-      location: data.location,
+      location: data.location.toString().trim(),
       user: data.user,
       comments: data.comments || ''
     });
@@ -301,8 +302,9 @@ function lookupBook(bookCode) {
   const standardCols = ['Book_code', 'Book_series', 'Book_name', 'Volume', 'Total', 'Last_update'];
   const locationCols = [];
   for (let i = 0; i < headers.length; i++) {
-    if (!standardCols.includes(headers[i]) && headers[i]) {
-      locationCols.push({ index: i, name: headers[i] });
+    const headerName = headers[i].toString().trim();
+    if (!standardCols.includes(headerName) && headerName) {
+      locationCols.push({ index: i, name: headerName });
     }
   }
 
@@ -376,9 +378,18 @@ function addTransaction(transaction) {
   const booksData = booksSheet.getDataRange().getValues();
   const headers = booksData[0];
 
-  // Find the column for this location
-  const locationColIndex = headers.indexOf(transaction.location);
-  const updateColIndex = headers.indexOf('Last_update');
+  // Find the column for this location (trim headers for comparison)
+  let locationColIndex = -1;
+  let updateColIndex = -1;
+  for (let i = 0; i < headers.length; i++) {
+    const headerName = headers[i].toString().trim();
+    if (headerName === transaction.location) {
+      locationColIndex = i;
+    }
+    if (headerName === 'Last_update') {
+      updateColIndex = i;
+    }
+  }
 
   if (locationColIndex === -1) {
     throw new Error('Location column "' + transaction.location + '" not found in Books sheet');
