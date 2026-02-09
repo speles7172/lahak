@@ -42,23 +42,33 @@ class BarcodeScanner {
         this.scanner = new Html5Qrcode('qr-reader');
       }
 
+      // Get the back camera (environment facing)
+      // On mobile, this is usually the rear camera
+      let cameraId = cameras[cameras.length - 1].id;
+
+      // Try to find environment-facing camera
+      for (let camera of cameras) {
+        if (camera.label.toLowerCase().includes('back') ||
+            camera.label.toLowerCase().includes('rear') ||
+            camera.label.toLowerCase().includes('environment')) {
+          cameraId = camera.id;
+          break;
+        }
+      }
+
       // Configure scanner for ISBN barcodes
       const config = {
-        fps: 10,
-        qrbox: function(viewfinderWidth, viewfinderHeight) {
-          // Use 80% of width for scanning area — helps detect from further away
-          let width = Math.floor(viewfinderWidth * 0.8);
-          let height = Math.floor(width * 0.35);
-          return { width: width, height: height };
-        },
-        aspectRatio: 1.777778,
-        disableFlip: false
+        fps: 5, // Lower FPS for better performance (reduces setTimeout warnings)
+        qrbox: { width: 350, height: 120 }, // Wide box for ISBN barcodes
+        aspectRatio: 1.777778, // 16:9 aspect ratio
+        disableFlip: false // Allow scanning from any orientation
+        // Removed formatsToSupport to allow ALL formats
       };
 
-      // Start scanning with video constraints instead of cameraId
+      // Start scanning
       console.log('Starting scanner with config:', config);
       await this.scanner.start(
-        { facingMode: 'environment' },
+        cameraId,
         config,
         (decodedText, decodedResult) => {
           // Success callback - barcode detected
@@ -81,9 +91,6 @@ class BarcodeScanner {
       this.isScanning = true;
       console.log('Scanner started successfully');
 
-      // Apply continuous autofocus on the active video track (critical for iPhone)
-      this._applyContinuousFocus();
-
     } catch (error) {
       console.error('Error starting scanner:', error);
       this.isScanning = false;
@@ -91,35 +98,6 @@ class BarcodeScanner {
         this.onScanError(error.message || 'Failed to start scanner');
       }
       throw error;
-    }
-  }
-
-  /**
-   * Apply continuous autofocus on the running video track.
-   * iPhone cameras default to single-shot autofocus which causes blur at close range.
-   */
-  _applyContinuousFocus() {
-    try {
-      const videoElement = document.querySelector('#qr-reader video');
-      if (!videoElement || !videoElement.srcObject) return;
-
-      const track = videoElement.srcObject.getVideoTracks()[0];
-      if (!track) return;
-
-      const capabilities = track.getCapabilities ? track.getCapabilities() : {};
-      if (capabilities.focusMode && capabilities.focusMode.includes('continuous')) {
-        track.applyConstraints({
-          advanced: [{ focusMode: 'continuous' }]
-        }).then(() => {
-          console.log('Continuous autofocus enabled');
-        }).catch(err => {
-          console.log('Could not set continuous focus:', err.message);
-        });
-      } else {
-        console.log('Continuous focus not supported by this camera');
-      }
-    } catch (e) {
-      console.log('Focus setting skipped:', e.message);
     }
   }
 
