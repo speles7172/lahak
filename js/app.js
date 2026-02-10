@@ -58,7 +58,14 @@ const elements = {
 
   // Status and loading
   statusMessage: document.getElementById('status-message'),
-  loadingSpinner: document.getElementById('loading-spinner')
+  loadingSpinner: document.getElementById('loading-spinner'),
+
+  // Data loading overlay (post-login)
+  dataLoadingOverlay: document.getElementById('data-loading-overlay'),
+  loadingTitle: document.getElementById('loading-title'),
+  loadingDetail: document.getElementById('loading-detail'),
+  progressBar: document.getElementById('progress-bar'),
+  loadingPercent: document.getElementById('loading-percent')
 };
 
 /**
@@ -76,9 +83,9 @@ function handleGoogleSignIn(response) {
 
   appState.userEmail = payload.email;
 
-  // Show loading
-  setLoading(true);
+  // Show data loading progress bar
   hideAuthError();
+  showDataLoading();
 
   // Load initial data from backend
   loadInitialData(payload.email);
@@ -107,23 +114,37 @@ function parseJwt(token) {
  */
 async function loadInitialData(email) {
   try {
+    // Step 1: Connecting
+    updateDataLoading(10, 'Connecting to server...');
+
+    // Step 2: Fetching data
+    updateDataLoading(30, 'Fetching inventory data...');
     const data = await window.sheetsAPI.loadInitData(email);
 
-    // Store user info
+    // Step 3: Processing user info
+    updateDataLoading(60, 'Loading user profile...');
     appState.user = data.user;
     appState.locations = data.locations;
 
-    // Build books map for O(1) lookup
+    // Step 4: Building book index
+    updateDataLoading(80, 'Indexing books...');
     appState.books.clear();
     for (const book of data.books) {
       const normalizedCode = normalizeBookCode(book.Book_code);
       appState.books.set(normalizedCode, book);
     }
 
+    // Step 5: Done
+    updateDataLoading(100, 'Ready!');
+
     // Mark as authenticated
     appState.isAuthenticated = true;
 
+    // Small delay so user sees 100%
+    await new Promise(resolve => setTimeout(resolve, 400));
+
     // Update UI
+    hideDataLoading();
     showMainApp();
     populateLocationsDropdown();
 
@@ -135,14 +156,13 @@ async function loadInitialData(email) {
 
   } catch (error) {
     console.error('Failed to load initial data:', error);
+    hideDataLoading();
 
     if (error.message.includes('not authorized') || error.message.includes('not registered')) {
       showAuthError(error.message);
     } else {
       showAuthError('Failed to connect to the server. Please try again.');
     }
-  } finally {
-    setLoading(false);
   }
 }
 
@@ -530,6 +550,32 @@ function resetTransactionForm() {
 
   // Focus back on manual input for next entry
   elements.manualCodeInput.focus();
+}
+
+/**
+ * Show data loading overlay with progress bar
+ */
+function showDataLoading() {
+  elements.dataLoadingOverlay.style.display = 'flex';
+  updateDataLoading(0, 'Connecting to server...');
+}
+
+/**
+ * Update data loading progress
+ */
+function updateDataLoading(percent, detail) {
+  elements.progressBar.style.width = percent + '%';
+  elements.loadingPercent.textContent = percent + '%';
+  if (detail) {
+    elements.loadingDetail.textContent = detail;
+  }
+}
+
+/**
+ * Hide data loading overlay
+ */
+function hideDataLoading() {
+  elements.dataLoadingOverlay.style.display = 'none';
 }
 
 /**

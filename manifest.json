@@ -1,6 +1,6 @@
 {
-  "name": "Inventory Manager",
-  "short_name": "Inventory",
+  "name": "Lahak Inventory",
+  "short_name": "Lahak",
   "description": "Mobile inventory management with barcode scanning and Google Sheets integration",
   "start_url": "/",
   "display": "standalone",
